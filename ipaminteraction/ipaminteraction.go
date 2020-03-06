@@ -61,6 +61,19 @@ func canonicalizeIP(ip *net.IP) error {
 	return fmt.Errorf("IP %s not v4 nor v6", *ip)
 }
 
+// ManipulateIPAMConfig creates new input to IPAM based on interface IP
+func ManipulateIPAMConfig(bytes []byte, envArgs string) (bool, error) {
+	n := Net{}
+	if err := json.Unmarshal(bytes, &n); err != nil {
+		return false, "", err
+	}
+
+	if envArgs != "" {
+		return true, nil
+	}
+	return false, nil
+}
+
 // LoadIPAMConfig creates IPAMConfig using json encoded configuration provided
 // as `bytes`. At the moment values provided in envArgs are ignored so there
 // is no possibility to overload the json configuration using envArgs
@@ -176,17 +189,4 @@ func LoadIPAMConfig(bytes []byte, envArgs string) (*IPAMConfig, string, error) {
 	n.IPAM.Name = n.Name
 
 	return n.IPAM, n.CNIVersion, nil
-}
-
-// ManipulateIPAMConfig creates new input to IPAM based on interface IP
-func ManipulateIPAMConfig(bytes []byte, envArgs string) (bool, error) {
-	n := Net{}
-	if err := json.Unmarshal(bytes, &n); err != nil {
-		return false, "", err
-	}
-
-	if envArgs != "" {
-		return true, nil
-	}
-	return false, nil
 }

@@ -244,16 +244,6 @@ func cmdAdd(args *skel.CmdArgs) error {
 	logging.Debugf("cmdAdd args.Args: %#v", args.Args)
 	logging.Debugf("\n")
 
-	env, err := ipaminteraction.ManipulateIPAMConfig(args.StdinData, args.Args)
-	if err != nil {
-		return err
-	}
-	if env == true {
-		logging.Debugf("ENVARGS: TRUE")
-	} else {
-		logging.Debugf("ENVARGS: FALSE")
-	}
-
 	ipamConf, confVersion, err := ipaminteraction.LoadIPAMConfig(args.StdinData, args.Args)
 	if err != nil {
 		return err
@@ -273,6 +263,16 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	logging.Debugf("ipamConf: %#v", ipamConf)
 	logging.Debugf("ipam conf version: %v", confVersion)
+
+	env, err := ipaminteraction.ManipulateIPAMConfig(args.StdinData, args.Args)
+	if err != nil {
+		return err
+	}
+	if env {
+		logging.Debugf("ENVARGS: TRUE")
+	} else {
+		logging.Debugf("ENVARGS: FALSE")
+	}
 
 	netns, err := ns.GetNS(args.Netns)
 	if err != nil {
