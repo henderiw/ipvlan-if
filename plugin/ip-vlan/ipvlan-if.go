@@ -17,8 +17,8 @@ import (
 	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/ns"
 	bv "github.com/containernetworking/plugins/pkg/utils/buildversion"
-	"github.com/henderiw/ipvlan-if/logging"
 	"github.com/henderiw/ipvlan-if/ipaminteraction"
+	"github.com/henderiw/ipvlan-if/logging"
 	"github.com/vishvananda/netlink/nl"
 )
 
@@ -212,6 +212,10 @@ func createIpvlan(conf *NetConf, ifName string, netns ns.NetNS) (*current.Interf
 func cmdAdd(args *skel.CmdArgs) error {
 
 	//args.IfName = "eth0"
+
+	logging.Debugf("/n")
+	logging.Debugf("cmdAdd args.Args: %#v", args.Args)
+	logging.Debugf("/n")
 
 	ipamConf, confVersion, err := ipaminteraction.LoadIPAMConfig(args.StdinData, args.Args)
 	if err != nil {

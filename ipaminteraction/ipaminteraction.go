@@ -8,6 +8,7 @@ import (
 
 	"github.com/containernetworking/cni/pkg/types"
 	types020 "github.com/containernetworking/cni/pkg/types/020"
+	"github.com/henderiw/ipvlan-if/logging"
 )
 
 type Net struct {
@@ -68,6 +69,11 @@ func LoadIPAMConfig(bytes []byte, envArgs string) (*IPAMConfig, string, error) {
 	if err := json.Unmarshal(bytes, &n); err != nil {
 		return nil, "", err
 	}
+
+	logging.Debugf("\n")
+	logging.Debugf("LoadIPAMConfig Net: %#v", n)
+	logging.Debugf("LoadIPAMConfig envArgs: %#v", envArgs)
+	logging.Debugf("\n")
 
 	// load IP from CNI_ARGS
 	if envArgs != "" {
