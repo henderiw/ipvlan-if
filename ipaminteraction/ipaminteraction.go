@@ -1,4 +1,4 @@
-package ipam-interact
+package ipaminteraction
 
 import (
 	"encoding/json"
