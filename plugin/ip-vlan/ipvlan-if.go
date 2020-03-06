@@ -17,8 +17,8 @@ import (
 	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/ns"
 	bv "github.com/containernetworking/plugins/pkg/utils/buildversion"
-	"github.com/henderiw/ipvlan-if/ipaminteraction"
 	"github.com/henderiw/ipvlan-if/logging"
+	"github.com/henderiw/ipvlan-if/ipaminteraction"
 	"github.com/vishvananda/netlink/nl"
 )
 
@@ -213,7 +213,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	//args.IfName = "eth0"
 
-	ipamConf, confVersion, err := ipam - interact.LoadIPAMConfig(args.StdinData, args.Args)
+	ipamConf, confVersion, err := ipaminteraction.LoadIPAMConfig(args.StdinData, args.Args)
 	if err != nil {
 		return err
 	}
