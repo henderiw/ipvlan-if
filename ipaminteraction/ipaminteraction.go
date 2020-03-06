@@ -65,7 +65,7 @@ func canonicalizeIP(ip *net.IP) error {
 func ManipulateIPAMConfig(bytes []byte, envArgs string) (bool, error) {
 	n := Net{}
 	if err := json.Unmarshal(bytes, &n); err != nil {
-		return false, "", err
+		return false, err
 	}
 
 	if envArgs != "" {
