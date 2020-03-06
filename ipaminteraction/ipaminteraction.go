@@ -177,3 +177,16 @@ func LoadIPAMConfig(bytes []byte, envArgs string) (*IPAMConfig, string, error) {
 
 	return n.IPAM, n.CNIVersion, nil
 }
+
+// ManipulateIPAMConfig creates new input to IPAM based on interface IP
+func ManipulateIPAMConfig(bytes []byte, envArgs string) (bool, error) {
+	n := Net{}
+	if err := json.Unmarshal(bytes, &n); err != nil {
+		return false, "", err
+	}
+
+	if envArgs != "" {
+		return true, nil
+	}
+	return false, nil
+}
