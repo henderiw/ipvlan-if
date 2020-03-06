@@ -18,15 +18,24 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	bv "github.com/containernetworking/plugins/pkg/utils/buildversion"
 	"github.com/henderiw/ipvlan-if/logging"
+	"github.com/vishvananda/netlink/nl"
+)
+
+// Family type definitions
+const (
+	FAMILY_ALL  = nl.FAMILY_ALL
+	FAMILY_V4   = nl.FAMILY_V4
+	FAMILY_V6   = nl.FAMILY_V6
+	FAMILY_MPLS = nl.FAMILY_MPLS
 )
 
 type NetConf struct {
 	types.NetConf
-	Master          string     `json:"master"`
-	Mode            string     `json:"mode"`
-	MTU             int        `json:"mtu"`
-	LogFile         string     `json:"logFile"`
-	LogLevel        string     `json:"logLevel"`
+	LogFile  string `json:"logFile"`
+	LogLevel string `json:"logLevel"`
+	Master   string `json:"master"`
+	Mode     string `json:"mode"`
+	MTU      int    `json:"mtu"`
 }
 
 func init() {
@@ -69,6 +78,7 @@ func loadConf(bytes []byte, cmdCheck bool) (*NetConf, string, error) {
 			return nil, "", logging.Errorf("could not convert result to current version: %v", err)
 		}
 	}
+	//n.Master = "eth0"
 	if n.Master == "" {
 		if result == nil {
 			return nil, "", logging.Errorf(`"master" field is required. It specifies the host interface name to virtualize`)
@@ -111,6 +121,8 @@ func modeToString(mode netlink.IPVlanMode) (string, error) {
 func createIpvlan(conf *NetConf, ifName string, netns ns.NetNS) (*current.Interface, error) {
 	ipvlan := &current.Interface{}
 
+	//ifName = "eth0"
+
 	mode, err := modeFromString(conf.Mode)
 	if err != nil {
 		return nil, err
@@ -120,6 +132,26 @@ func createIpvlan(conf *NetConf, ifName string, netns ns.NetNS) (*current.Interf
 	if err != nil {
 		return nil, logging.Errorf("failed to lookup master %q: %v", conf.Master, err)
 	}
+
+	addrs, err := netlink.AddrList(m, FAMILY_ALL)
+	for i := 0; i < len(addrs); i++ {
+		family := nl.GetIPFamily(addrs[i].IP)
+		logging.Debugf("\n")
+		logging.Debugf("addrs family: %v", family)
+		logging.Debugf("addrs IPNet IP: %v", addrs[i].IP)
+		logging.Debugf("addrs IPNet Mask: %v", addrs[i].Mask)
+		logging.Debugf("addrs label: %v", addrs[i].Label)
+		logging.Debugf("addrs flags: %d", addrs[i].Flags)
+		logging.Debugf("addrs Scope: %d", addrs[i].Scope)
+		//logging.Debugf("addrs Peer IP: %#v", addrs[i].Peer.IP)
+		//logging.Debugf("addrs Peer MAsk: %#v", addrs[i].Peer.Mask)
+		logging.Debugf("addrs Broadcast: %v", addrs[i].Broadcast)
+		logging.Debugf("addrs PreferedLft: %v", addrs[i].PreferedLft)
+		logging.Debugf("addrs ValidLft: %v", addrs[i].ValidLft)
+	}
+
+	logging.Debugf("\n")
+	logging.Debugf("createIpvlan: %v, %#v, %#v, %#v", ifName, conf, mode, m)
 
 	// due to kernel bug we have to create with tmpname or it might
 	// collide with the name on the host and error out
@@ -155,7 +187,17 @@ func createIpvlan(conf *NetConf, ifName string, netns ns.NetNS) (*current.Interf
 			return logging.Errorf("failed to refetch ipvlan %q: %v", ipvlan.Name, err)
 		}
 		ipvlan.Mac = contIpvlan.Attrs().HardwareAddr.String()
+		//ipvlan.IP = contIpvlan.Attrs().OperState
 		ipvlan.Sandbox = netns.Path()
+
+		addrs, err := netlink.AddrList(contIpvlan, FAMILY_ALL)
+
+		logging.Debugf("createIpvlan: %v, %#v", ipvlan.Mac, ipvlan.Sandbox)
+		logging.Debugf("\n")
+		logging.Debugf("contIpvlan: %#v", contIpvlan)
+		logging.Debugf("\n")
+		logging.Debugf("addrs: %#v", addrs)
+		logging.Debugf("\n")
 
 		return nil
 	})
@@ -167,6 +209,19 @@ func createIpvlan(conf *NetConf, ifName string, netns ns.NetNS) (*current.Interf
 }
 
 func cmdAdd(args *skel.CmdArgs) error {
+
+	//args.IfName = "eth0"
+
+	ipamConf, confVersion, err := LoadIPAMConfig(args.StdinData, args.Args)
+	if err != nil {
+		return err
+	}
+
+	logging.Debugf("/n")
+	logging.Debugf("ipamConf: %#v", ipamConf)
+	logging.Debugf("ipam conf version: %v", confVersion)
+	logging.Debugf("/n")
+
 	n, cniVersion, err := loadConf(args.StdinData, false)
 	if err != nil {
 		return err
@@ -178,7 +233,11 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 	defer netns.Close()
 
-	logging.Debugf("cmdDel: %v, %v, %v, %v, %v ", n, netns, n.IPAM.Type, args.IfName, n.PrevResult)
+	logging.Debugf("cmdAdd: %#v, %v, %v, %v, %#v ", n, args.Netns, n.IPAM.Type, args.IfName, n.PrevResult)
+	logging.Debugf("cmdAdd n.IPAM.Type: %v", n.IPAM.Type)
+	//logging.Debugf("cmdAdd n.IPAM.Subnet: %v", n.IPAM.Subnet)
+	//logging.Debugf("cmdAdd n.IPAM.RangeStart: %v", n.IPAM.RangeStart)
+	//logging.Debugf("cmdAdd n.IPAM.RangeEnd: %v", n.IPAM.RangeEnd)
 
 	ipvlanInterface, err := createIpvlan(n, args.IfName, netns)
 	if err != nil {
@@ -200,6 +259,11 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 	if !haveResult {
 		// run the IPAM plugin and get back the config to apply
+
+		logging.Debugf("\n")
+		logging.Debugf("ipAM Add: %#v", args.StdinData)
+		logging.Debugf("\n")
+
 		r, err := ipam.ExecAdd(n.IPAM.Type, args.StdinData)
 		if err != nil {
 			return err
@@ -242,7 +306,6 @@ func cmdAdd(args *skel.CmdArgs) error {
 }
 
 func cmdCheck(args *skel.CmdArgs) error {
-
 	n, _, err := loadConf(args.StdinData, true)
 	if err != nil {
 		return err
@@ -325,8 +388,9 @@ func cmdCheck(args *skel.CmdArgs) error {
 	return nil
 }
 
-
 func cmdDel(args *skel.CmdArgs) error {
+	//args.IfName = "eth0"
+
 	n, _, err := loadConf(args.StdinData, false)
 	if err != nil {
 		return err
@@ -363,8 +427,6 @@ func cmdDel(args *skel.CmdArgs) error {
 func main() {
 	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, bv.BuildString("ipvlan-if"))
 }
-
-
 
 func validateCniContainerInterface(intf current.Interface, masterIndex int, modeExpected string) error {
 

@@ -1,0 +1,21 @@
+---
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: external-ipvlan-if
+spec:
+  config: '{
+      "cniVersion": "0.3.1",
+      "name": "external-ipvlan-if",
+      "type": "ipvlan-if",
+      "logFile": "/var/log/ipvlan-if.log",
+      "logLevel": "debug",
+      "master": "eth1",
+      "ipam": {
+				"type": "static",
+				"addresses": [{
+						"address": "10.2.0.104/24",
+						"gateway": "10.2.0.1"
+					}]
+			}
+    }'

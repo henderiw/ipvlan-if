@@ -5,13 +5,12 @@ metadata:
   name: external-ipvlan-if
 spec:
   config: '{
-      "LogFile": "/var/log/ipvlan-if.log",
-      "LogLevel": "debug",
+      "cniVersion": "0.3.1",
       "name": "external-ipvlan-if",
       "type": "ipvlan-if",
-      "master": "eth2",
-      "vlan": 1925,
-      "if0name": "eth2",
+      "logFile": "/var/log/ipvlan-if.log",
+      "logLevel": "debug",
+      "master": "eth1",
       "ipam": {
               "type": "host-local",
               "subnet": "10.2.0.0/24",
