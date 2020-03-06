@@ -17,7 +17,7 @@ import (
 	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/ns"
 	bv "github.com/containernetworking/plugins/pkg/utils/buildversion"
-	"github.com/henderiw/ipvlan-if/ipam-interact"
+	"github.com/henderiw/ipvlan-if/ipaminteraction"
 	"github.com/henderiw/ipvlan-if/logging"
 	"github.com/vishvananda/netlink/nl"
 )
