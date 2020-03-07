@@ -319,6 +319,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 			return err
 		}
 		result := &current.Result{}
+		result.CNIVersion = confVersion
 		result.DNS = ipamConf.DNS
 		result.Routes = ipamConf.Routes
 		for _, v := range ipamConf.Addresses {
@@ -327,7 +328,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 				Address: v.Address,
 				Gateway: v.Gateway})
 		}
-		r := types.PrintResult(result, confVersion)
+
+		//r := types.PrintResult(result, confVersion)
 		/*
 			r, err := ipam.ExecAdd(n.IPAM.Type, args.StdinData)
 			if err != nil {
@@ -346,10 +348,12 @@ func cmdAdd(args *skel.CmdArgs) error {
 		*/
 
 		// Convert whatever the IPAM result was into the current Result type
-		result, err = current.NewResultFromResult(r)
-		if err != nil {
-			return err
-		}
+		/*
+			result, err = current.NewResultFromResult(r)
+			if err != nil {
+				return err
+			}
+		*/
 
 		logging.Debugf("IPAM Add result: %#v", result)
 

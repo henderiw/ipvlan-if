@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net"
 
-	"cloud.google.com/go/logging"
 	"github.com/containernetworking/cni/pkg/types"
 	types020 "github.com/containernetworking/cni/pkg/types/020"
-	"github.com/henderiw/nuage-nsg/go/src/github.com/vishvananda/netlink"
+	"github.com/henderiw/ipvlan-if/logging"
+	"github.com/vishvananda/netlink"
 )
 
 type Net struct {
@@ -80,12 +80,32 @@ func LoadIPAMConfig(ifAddr *netlink.Addr, bytes []byte, envArgs string) (*IPAMCo
 	// Validate all ranges
 	numV4 := 0
 	numV6 := 0
+	var ipNet *net.IPNet
 
 	if ifAddr != nil {
-		logging.Debug("IPAM ifAddr IP: %v", ifAddr.IP)
-		logging.Debug("IPAM ifAddr IP: %v", ifAddr.Mask)
+		logging.Debugf("IPAM ifAddr IP: %v", ifAddr.IP)
+		logging.Debugf("IPAM ifAddr IP: %v", ifAddr.Mask)
+		ipNet.IP = ifAddr.IP
+		ipnet.Mask = ifAddr.Mask
+
+		n.IPAM.Addresses[0].AddressStr = (string)ifAddr.IP + "/" + (string)ifAddr.Mask
+		n.IPAM.Addresses[0].Address.IP = ifAddr.IP
+		n.IPAM.Addresses[0].Address.Mask = ifAddr.Mask
+
+		if err := canonicalizeIP(&n.IPAM.Addresses[0].Address.IP); err != nil {
+			return nil, "", fmt.Errorf("invalid address %d: %s", i, err)
+		}
+
+		if n.IPAM.Addresses[0].Address.IP.To4() != nil {
+			n.IPAM.Addresses[0].Version = "4"
+			numV4++
+		} else {
+			n.IPAM.Addresses[0].Version = "6"
+			numV6++
+		}
 	}
 
+	/*
 	for i := range n.IPAM.Addresses {
 		ip, addr, err := net.ParseCIDR(n.IPAM.Addresses[i].AddressStr)
 		if err != nil {
@@ -94,9 +114,9 @@ func LoadIPAMConfig(ifAddr *netlink.Addr, bytes []byte, envArgs string) (*IPAMCo
 		n.IPAM.Addresses[i].Address = *addr
 		n.IPAM.Addresses[i].Address.IP = ip
 
-		logging.Debug("IPAM Addresses AddressStr: %v", n.IPAM.Addresses[i].AddressStr)
-		logging.Debug("IPAM Addresses AddressStr: %v", n.IPAM.Addresses[i].Address)
-		logging.Debug("IPAM Addresses AddressStr: %v", n.IPAM.Addresses[i].Address.IP)
+		logging.Debugf("IPAM Addresses AddressStr: %v", n.IPAM.Addresses[i].AddressStr)
+		logging.Debugf("IPAM Addresses Address: %v", n.IPAM.Addresses[i].Address)
+		logging.Debugf("IPAM Addresses Address IP: %v", n.IPAM.Addresses[i].Address.IP)
 
 		if err := canonicalizeIP(&n.IPAM.Addresses[i].Address.IP); err != nil {
 			return nil, "", fmt.Errorf("invalid address %d: %s", i, err)
@@ -110,6 +130,7 @@ func LoadIPAMConfig(ifAddr *netlink.Addr, bytes []byte, envArgs string) (*IPAMCo
 			numV6++
 		}
 	}
+	*/
 
 	// CNI spec 0.2.0 and below supported only one v4 and v6 address
 	if numV4 > 1 || numV6 > 1 {
