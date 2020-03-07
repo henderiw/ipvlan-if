@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"runtime"
 
 	"github.com/vishvananda/netlink"
@@ -120,7 +119,7 @@ func modeToString(mode netlink.IPVlanMode) (string, error) {
 	}
 }
 
-func createIpvlan(conf *NetConf, ifName string, netns ns.NetNS) (*current.Interface, *net.IP, error) {
+func createIpvlan(conf *NetConf, ifName string, netns ns.NetNS) (*current.Interface, *netlink.Addr, error) {
 	ipvlan := &current.Interface{}
 
 	//ifName = "eth0"
@@ -162,6 +161,7 @@ func createIpvlan(conf *NetConf, ifName string, netns ns.NetNS) (*current.Interf
 	if found == true {
 		logging.Debugf("\n")
 		logging.Debugf("DELETE INTERFACE ADDRESS: %v", addrs[index].IP)
+		logging.Debugf("DELETE INTERFACE ADDRESS: %v", addrs[index].Mask)
 		logging.Debugf("\n")
 
 		err := netlink.AddrDel(m, &addrs[index])
@@ -226,7 +226,7 @@ func createIpvlan(conf *NetConf, ifName string, netns ns.NetNS) (*current.Interf
 	}
 
 	if found == true {
-		return ipvlan, &addrs[index].IP, nil
+		return ipvlan, &addrs[index], nil
 	}
 	return ipvlan, nil, nil
 
@@ -242,37 +242,41 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	logging.Debugf("cmdAdd args.Args: %#v", args.Args)
-	logging.Debugf("\n")
 
-	ipamConf, confVersion, err := ipaminteraction.LoadIPAMConfig(args.StdinData, args.Args)
-	if err != nil {
-		return err
-	}
+	/*
 
-	logging.Debugf("ipamConf Name: %v", ipamConf.Name)
-	logging.Debugf("ipamConf Type: %v", ipamConf.Type)
-	for _, r := range ipamConf.Routes {
-		logging.Debugf("ipamConf Route: %v", r)
-	}
-	for _, a := range ipamConf.Addresses {
-		logging.Debugf("ipamConf Address AddressStr: %v", a.AddressStr)
-		logging.Debugf("ipamConf Address Gateway: %#v", a.Gateway)
-		logging.Debugf("ipamConf Address Address: %#v", a.AddressStr)
-		logging.Debugf("ipamConf Address Version: %v", a.Version)
-	}
+		ipamConf, confVersion, err := ipaminteraction.LoadIPAMConfig(args.StdinData, args.Args)
+		if err != nil {
+			return err
+		}
 
-	logging.Debugf("ipamConf: %#v", ipamConf)
-	logging.Debugf("ipam conf version: %v", confVersion)
+		logging.Debugf("ipamConf Name: %v", ipamConf.Name)
+		logging.Debugf("ipamConf Type: %v", ipamConf.Type)
+		for _, r := range ipamConf.Routes {
+			logging.Debugf("ipamConf Route: %v", r)
+		}
+		for _, a := range ipamConf.Addresses {
+			logging.Debugf("ipamConf Address AddressStr: %v", a.AddressStr)
+			logging.Debugf("ipamConf Address Gateway: %#v", a.Gateway)
+			logging.Debugf("ipamConf Address Address: %#v", a.AddressStr)
+			logging.Debugf("ipamConf Address Version: %v", a.Version)
+		}
+	*/
 
-	env, err := ipaminteraction.ManipulateIPAMConfig(args.StdinData, args.Args)
-	if err != nil {
-		return err
-	}
-	if env {
-		logging.Debugf("ENVARGS: TRUE")
-	} else {
-		logging.Debugf("ENVARGS: FALSE")
-	}
+	//logging.Debugf("ipamConf: %#v", ipamConf)
+	//logging.Debugf("ipam conf version: %v", confVersion)
+
+	/*
+		env, err := ipaminteraction.ManipulateIPAMConfig(args.StdinData, args.Args)
+		if err != nil {
+			return err
+		}
+		if env {
+			logging.Debugf("ENVARGS: TRUE")
+		} else {
+			logging.Debugf("ENVARGS: FALSE")
+		}
+	*/
 
 	netns, err := ns.GetNS(args.Netns)
 	if err != nil {
@@ -280,20 +284,19 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 	defer netns.Close()
 
-	logging.Debugf("cmdAdd: %#v, %v, %v, %v, %#v ", n, args.Netns, n.IPAM.Type, args.IfName, n.PrevResult)
-	logging.Debugf("cmdAdd n.IPAM.Type: %v", n.IPAM.Type)
+	//logging.Debugf("cmdAdd: %#v, %v, %v, %v, %#v ", n, args.Netns, n.IPAM.Type, args.IfName, n.PrevResult)
+	//logging.Debugf("cmdAdd n.IPAM.Type: %v", n.IPAM.Type)
 	//logging.Debugf("cmdAdd n.IPAM.Subnet: %v", n.IPAM.Subnet)
 	//logging.Debugf("cmdAdd n.IPAM.RangeStart: %v", n.IPAM.RangeStart)
 	//logging.Debugf("cmdAdd n.IPAM.RangeEnd: %v", n.IPAM.RangeEnd)
 
-	ipvlanInterface, ifIP, err := createIpvlan(n, args.IfName, netns)
+	ipvlanInterface, ifAddr, err := createIpvlan(n, args.IfName, netns)
 	if err != nil {
 		return err
 	}
 
-	logging.Debugf("/n")
-	logging.Debugf("cmdAdd ifIP: %v", ifIP)
-	logging.Debugf("/n")
+	logging.Debugf("cmdAdd ifAddr: %v", ifAddr.IP)
+	logging.Debugf("cmdAdd ifAddr: %v", ifAddr.Mask)
 
 	var result *current.Result
 	// Configure iface from PrevResult if we have IPs and an IPAM
@@ -311,27 +314,44 @@ func cmdAdd(args *skel.CmdArgs) error {
 	if !haveResult {
 		// run the IPAM plugin and get back the config to apply
 
-		logging.Debugf("\n")
-		logging.Debugf("ipAM Add: %#v", args.StdinData)
-		logging.Debugf("\n")
-
-		r, err := ipam.ExecAdd(n.IPAM.Type, args.StdinData)
+		ipamConf, confVersion, err := ipaminteraction.LoadIPAMConfig(ifAddr, args.StdinData, args.Args)
 		if err != nil {
 			return err
 		}
-
-		// Invoke ipam del if err to avoid ip leak
-		defer func() {
+		result := &current.Result{}
+		result.DNS = ipamConf.DNS
+		result.Routes = ipamConf.Routes
+		for _, v := range ipamConf.Addresses {
+			result.IPs = append(result.IPs, &current.IPConfig{
+				Version: v.Version,
+				Address: v.Address,
+				Gateway: v.Gateway})
+		}
+		r := types.PrintResult(result, confVersion)
+		/*
+			r, err := ipam.ExecAdd(n.IPAM.Type, args.StdinData)
 			if err != nil {
-				ipam.ExecDel(n.IPAM.Type, args.StdinData)
+				return err
 			}
-		}()
+
+			logging.Debugf("IPAM Add result: %#v", r)
+
+			// Invoke ipam del if err to avoid ip leak
+			defer func() {
+				if err != nil {
+					ipam.ExecDel(n.IPAM.Type, args.StdinData)
+				}
+			}()
+
+		*/
 
 		// Convert whatever the IPAM result was into the current Result type
 		result, err = current.NewResultFromResult(r)
 		if err != nil {
 			return err
 		}
+
+		logging.Debugf("IPAM Add result: %#v", result)
 
 		if len(result.IPs) == 0 {
 			return errors.New("IPAM plugin returned missing IP config")
@@ -344,6 +364,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	result.Interfaces = []*current.Interface{ipvlanInterface}
 
+	logging.Debugf("IPAM result interfaces: %#v", result)
+
 	err = netns.Do(func(_ ns.NetNS) error {
 		return ipam.ConfigureIface(args.IfName, result)
 	})
@@ -352,6 +374,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	result.DNS = n.DNS
+
+	logging.Debugf("cmd Add finish result: %#v", result)
 
 	return types.PrintResult(result, cniVersion)
 }
@@ -447,38 +471,40 @@ func cmdDel(args *skel.CmdArgs) error {
 		return err
 	}
 
-	logging.Debugf("/n")
 	logging.Debugf("cmdDel args.Args: %#v", args.Args)
-	logging.Debugf("/n")
 
-	ipamConf, confVersion, err := ipaminteraction.LoadIPAMConfig(args.StdinData, args.Args)
-	if err != nil {
-		return err
-	}
+	/*
+		logging.Debugf("cmdDel args.Args: %#v", args.Args)
 
-	logging.Debugf("/n")
-	logging.Debugf("cmdDel ipamConf Name: %v", ipamConf.Name)
-	logging.Debugf("cmdDel ipamConf Type: %v", ipamConf.Type)
-	for _, r := range ipamConf.Routes {
-		logging.Debugf("cmdDel ipamConf Route: %v", r)
-	}
-	for _, a := range ipamConf.Addresses {
-		logging.Debugf("cmdDel ipamConf Address AddressStr: %v", a.AddressStr)
-		logging.Debugf("cmdDel ipamConf Address Gateway: %#v", a.Gateway)
-		logging.Debugf("cmdDel ipamConf Address Address: %#v", a.AddressStr)
-		logging.Debugf("cmdDel ipamConf Address Version: %v", a.Version)
-	}
-	logging.Debugf("/n")
+		ipamConf, confVersion, err := ipaminteraction.LoadIPAMConfig(args.StdinData, args.Args)
+		if err != nil {
+			return err
+		}
 
-	logging.Debugf("/n")
-	logging.Debugf("cmdDel ipamConf: %#v", ipamConf)
-	logging.Debugf("cmdDel ipam conf version: %v", confVersion)
-	logging.Debugf("/n")
+		logging.Debugf("/n")
+		logging.Debugf("cmdDel ipamConf Name: %v", ipamConf.Name)
+		logging.Debugf("cmdDel ipamConf Type: %v", ipamConf.Type)
+		for _, r := range ipamConf.Routes {
+			logging.Debugf("cmdDel ipamConf Route: %v", r)
+		}
+		for _, a := range ipamConf.Addresses {
+			logging.Debugf("cmdDel ipamConf Address AddressStr: %v", a.AddressStr)
+			logging.Debugf("cmdDel ipamConf Address Gateway: %#v", a.Gateway)
+			logging.Debugf("cmdDel ipamConf Address Address: %#v", a.AddressStr)
+			logging.Debugf("cmdDel ipamConf Address Version: %v", a.Version)
+		}
+		logging.Debugf("/n")
 
-	logging.Debugf("/n")
-	logging.Debugf("cmdDel Conf: %#v", n)
-	logging.Debugf("cmdDel Netns: %v", args.Netns)
-	logging.Debugf("/n")
+		logging.Debugf("/n")
+		logging.Debugf("cmdDel ipamConf: %#v", ipamConf)
+		logging.Debugf("cmdDel ipam conf version: %v", confVersion)
+		logging.Debugf("/n")
+
+		logging.Debugf("/n")
+		logging.Debugf("cmdDel Conf: %#v", n)
+		logging.Debugf("cmdDel Netns: %v", args.Netns)
+		logging.Debugf("/n")
+	*/
 
 	// On chained invocation, IPAM block can be empty
 	if n.IPAM.Type != "" {
