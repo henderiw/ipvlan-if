@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strconv"
 
 	"github.com/containernetworking/cni/pkg/types"
-	types020 "github.com/containernetworking/cni/pkg/types/020"
 	"github.com/henderiw/ipvlan-if/logging"
 	"github.com/vishvananda/netlink"
 )
@@ -74,75 +74,44 @@ func LoadIPAMConfig(ifAddr *netlink.Addr, bytes []byte, envArgs string) (*IPAMCo
 	//logging.Debugf("LoadIPAMConfig envArgs: %#v", envArgs)
 
 	if n.IPAM == nil {
+		logging.Debugf("IPAM config missing 'ipam' key")
 		return nil, "", fmt.Errorf("IPAM config missing 'ipam' key")
 	}
 
-	// Validate all ranges
-	numV4 := 0
-	numV6 := 0
-	var ipNet *net.IPNet
-
 	if ifAddr != nil {
 		logging.Debugf("IPAM ifAddr IP: %v", ifAddr.IP)
-		logging.Debugf("IPAM ifAddr IP: %v", ifAddr.Mask)
-		ipNet.IP = ifAddr.IP
-		ipnet.Mask = ifAddr.Mask
+		logging.Debugf("IPAM ifAddr mask hex: %v", ifAddr.Mask)
+		logging.Debugf("IPAM ifAddr mash dec: %v", net.IP(ifAddr.Mask))
 
-		n.IPAM.Addresses[0].AddressStr = (string)ifAddr.IP + "/" + (string)ifAddr.Mask
+		mask := net.IPMask(net.ParseIP(net.IP(ifAddr.Mask).String()).To4())
+		prefixSize, _ := mask.Size()
+
+		logging.Debugf("IPAM ifAddr mash dec: %v", prefixSize)
+
+		n.IPAM.Addresses[0].AddressStr = ifAddr.IP.String() + "/" + strconv.Itoa(prefixSize)
 		n.IPAM.Addresses[0].Address.IP = ifAddr.IP
 		n.IPAM.Addresses[0].Address.Mask = ifAddr.Mask
 
+		logging.Debugf("IPAM Addresses AddressStr: %v", n.IPAM.Addresses[0].AddressStr)
+		logging.Debugf("IPAM Addresses Address: %v", n.IPAM.Addresses[0].Address)
+		logging.Debugf("IPAM Addresses Address IP: %v", n.IPAM.Addresses[0].Address.IP)
+
 		if err := canonicalizeIP(&n.IPAM.Addresses[0].Address.IP); err != nil {
-			return nil, "", fmt.Errorf("invalid address %d: %s", i, err)
+			return nil, "", logging.Debugf("invalid address %d: %s", 0, err)
 		}
 
 		if n.IPAM.Addresses[0].Address.IP.To4() != nil {
 			n.IPAM.Addresses[0].Version = "4"
-			numV4++
 		} else {
 			n.IPAM.Addresses[0].Version = "6"
-			numV6++
-		}
-	}
-
-	/*
-	for i := range n.IPAM.Addresses {
-		ip, addr, err := net.ParseCIDR(n.IPAM.Addresses[i].AddressStr)
-		if err != nil {
-			return nil, "", fmt.Errorf("invalid CIDR %s: %s", n.IPAM.Addresses[i].AddressStr, err)
-		}
-		n.IPAM.Addresses[i].Address = *addr
-		n.IPAM.Addresses[i].Address.IP = ip
-
-		logging.Debugf("IPAM Addresses AddressStr: %v", n.IPAM.Addresses[i].AddressStr)
-		logging.Debugf("IPAM Addresses Address: %v", n.IPAM.Addresses[i].Address)
-		logging.Debugf("IPAM Addresses Address IP: %v", n.IPAM.Addresses[i].Address.IP)
-
-		if err := canonicalizeIP(&n.IPAM.Addresses[i].Address.IP); err != nil {
-			return nil, "", fmt.Errorf("invalid address %d: %s", i, err)
 		}
 
-		if n.IPAM.Addresses[i].Address.IP.To4() != nil {
-			n.IPAM.Addresses[i].Version = "4"
-			numV4++
-		} else {
-			n.IPAM.Addresses[i].Version = "6"
-			numV6++
-		}
-	}
-	*/
-
-	// CNI spec 0.2.0 and below supported only one v4 and v6 address
-	if numV4 > 1 || numV6 > 1 {
-		for _, v := range types020.SupportedVersions {
-			if n.CNIVersion == v {
-				return nil, "", fmt.Errorf("CNI version %v does not support more than 1 address per family", n.CNIVersion)
-			}
-		}
+		logging.Debugf("IPAM Addresses Address Version: %v", n.IPAM.Addresses[0].Version)
 	}
 
 	// Copy net name into IPAM so not to drag Net struct around
 	n.IPAM.Name = n.Name
+	logging.Debugf("IPAM name: %v", n.IPAM.Name)
 
 	return n.IPAM, n.CNIVersion, nil
 }
